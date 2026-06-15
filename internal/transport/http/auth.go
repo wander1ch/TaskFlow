@@ -17,6 +17,15 @@ func NewAuthHandler(authService service.AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
+// @Summary Регистрация пользователя
+// @Description Создает нового пользователя
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param input body dto.RegisterRequest true "Данные пользователя"
+// @Success 201 {object} dto.AuthResponse
+// @Failure 400,409 {object} map[string]string
+// @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req dto.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -37,6 +46,15 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, resp)
 }
 
+// @Summary Вход пользователя
+// @Description Авторизует пользователя и возвращает токен
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param input body dto.LoginRequest true "Данные для входа"
+// @Success 200 {object} dto.AuthResponse
+// @Failure 400,401 {object} map[string]string
+// @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req dto.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -53,6 +71,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// @Summary Получение данных текущего пользователя
+// @Description Возвращает профиль текущего авторизованного пользователя
+// @Tags auth
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} dto.UserResponse
+// @Failure 500 {object} map[string]string
+// @Router /auth/me [get]
 func (h *AuthHandler) GetMe(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	resp, err := h.authService.GetMe(c.Request.Context(), userID)

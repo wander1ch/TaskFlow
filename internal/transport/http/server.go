@@ -2,6 +2,8 @@ package http
 
 import (
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/sotremont/taskflow/internal/config"
 	"github.com/sotremont/taskflow/internal/transport/middleware"
 )
@@ -38,6 +40,7 @@ func NewServer(
 }
 
 func (s *Server) setupRoutes() {
+	s.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	s.router.StaticFile("/", "./web/static/index.html")
 	s.router.Static("/static", "./web/static")
 

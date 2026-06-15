@@ -13,7 +13,17 @@ import (
 	"github.com/sotremont/taskflow/internal/repository"
 	"github.com/sotremont/taskflow/internal/service"
 	"github.com/sotremont/taskflow/internal/transport/http"
+	_ "github.com/sotremont/taskflow/docs"
 )
+
+// @title TaskFlow API
+// @version 1.0
+// @description This is a task management server.
+// @host localhost:8080
+// @BasePath /api/v1
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 
 func main() {
 	cfg := config.LoadConfig()

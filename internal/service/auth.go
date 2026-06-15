@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/sotremont/taskflow/internal/domain"
 	"github.com/sotremont/taskflow/internal/dto"
 	"github.com/sotremont/taskflow/internal/repository"
@@ -20,7 +21,40 @@ var (
 type AuthService interface {
 	Register(ctx context.Context, req dto.RegisterRequest) (*dto.AuthResponse, error)
 	Login(ctx context.Context, req dto.LoginRequest) (*dto.AuthResponse, error)
+	GetMe(ctx context.Context, userID uuid.UUID) (*dto.UserResponse, error)
 	GenerateToken(user *domain.User) (string, error)
+}
+
+// ... (existing struct and NewAuthService)
+
+func (s *authService) GetMe(ctx context.Context, userID uuid.UUID) (*dto.UserResponse, error) {
+	user, err := s.repo.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch user roles
+	roles := []dto.UserTeamRole{}
+	memberships, err := s.teamRepo.GetMembersByUserID(ctx, user.ID)
+	if err == nil {
+		for _, m := range memberships {
+			team, err := s.teamRepo.GetByID(ctx, m.TeamID)
+			if err == nil && team != nil {
+				roles = append(roles, dto.UserTeamRole{
+					TeamID:   m.TeamID,
+					TeamName: team.Name,
+					Role:     m.Role,
+				})
+			}
+		}
+	}
+
+	return &dto.UserResponse{
+		ID:        user.ID,
+		Email:     user.Email,
+		CreatedAt: user.CreatedAt,
+		Roles:     roles,
+	}, nil
 }
 
 type authService struct {

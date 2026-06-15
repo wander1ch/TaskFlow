@@ -69,6 +69,25 @@ func (r *teamRepo) ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain
 	return teams, nil
 }
 
+func (r *teamRepo) List(ctx context.Context) ([]domain.Team, error) {
+	query := `SELECT id, name, owner_id, created_at FROM teams`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teams []domain.Team
+	for rows.Next() {
+		var t domain.Team
+		if err := rows.Scan(&t.ID, &t.Name, &t.OwnerID, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		teams = append(teams, t)
+	}
+	return teams, nil
+}
+
 func (r *teamRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	query := `DELETE FROM teams WHERE id = $1`
 	_, err := r.pool.Exec(ctx, query, id)

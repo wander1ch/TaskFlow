@@ -28,7 +28,7 @@ func (h *TaskHandler) Create(c *gin.Context) {
 
 	resp, err := h.taskService.CreateTask(c.Request.Context(), userID, req)
 	if err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

@@ -47,6 +47,7 @@ func (s *Server) setupRoutes() {
 		{
 			auth.POST("/register", s.authHandler.Register)
 			auth.POST("/login", s.authHandler.Login)
+			auth.GET("/me", middleware.AuthMiddleware(s.config.JWTSecret), s.authHandler.GetMe)
 		}
 
 		protected := v1.Group("")
@@ -56,13 +57,15 @@ func (s *Server) setupRoutes() {
 			{
 				teams.POST("", s.teamHandler.Create)
 				teams.GET("", s.teamHandler.List)
+				teams.GET("/all", s.teamHandler.ListAll)
 				teams.GET("/:id", s.teamHandler.Get)
 				teams.DELETE("/:id", s.teamHandler.Delete)
 				teams.POST("/:id/members", s.teamHandler.AddMember)
+				teams.POST("/:id/join", s.teamHandler.Join)
 				teams.GET("/:id/members", s.teamHandler.GetMembers)
+				teams.PATCH("/:id/members/:user_id/role", s.teamHandler.UpdateMemberRole)
 				teams.GET("/:id/analytics", s.taskHandler.GetAnalytics)
 			}
-
 			tasks := protected.Group("/tasks")
 			{
 				tasks.POST("", s.taskHandler.Create)

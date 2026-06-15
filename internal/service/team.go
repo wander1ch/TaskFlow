@@ -16,11 +16,35 @@ type TeamService interface {
 	CreateTeam(ctx context.Context, userID uuid.UUID, req dto.CreateTeamRequest) (*dto.TeamResponse, error)
 	GetTeam(ctx context.Context, teamID uuid.UUID) (*dto.TeamResponse, error)
 	ListTeams(ctx context.Context, userID uuid.UUID) ([]dto.TeamResponse, error)
+	ListAllTeams(ctx context.Context) ([]dto.TeamResponse, error)
 	AddMember(ctx context.Context, operatorID, teamID uuid.UUID, req dto.AddMemberRequest) error
+	JoinTeam(ctx context.Context, userID, teamID uuid.UUID) error
 	GetMembers(ctx context.Context, teamID uuid.UUID) ([]dto.MemberResponse, error)
 	DeleteTeam(ctx context.Context, operatorID, teamID uuid.UUID) error
 	CheckRole(ctx context.Context, teamID, userID uuid.UUID, requiredRoles ...domain.Role) (bool, error)
 	UpdateMemberRole(ctx context.Context, operatorID, teamID, targetUserID uuid.UUID, newRole domain.Role) error
+}
+
+func (s *teamService) ListAllTeams(ctx context.Context) ([]dto.TeamResponse, error) {
+	teams, err := s.teamRepo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := make([]dto.TeamResponse, len(teams))
+	for i, t := range teams {
+		resp[i] = dto.TeamResponse{
+			ID:        t.ID,
+			Name:      t.Name,
+			OwnerID:   t.OwnerID,
+			CreatedAt: t.CreatedAt,
+		}
+	}
+	return resp, nil
+}
+
+func (s *teamService) JoinTeam(ctx context.Context, userID, teamID uuid.UUID) error {
+	return s.teamRepo.AddMember(ctx, teamID, userID, domain.RoleMember)
 }
 
 type teamService struct {

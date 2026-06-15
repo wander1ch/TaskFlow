@@ -45,6 +45,32 @@ func (h *TeamHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+func (h *TeamHandler) ListAll(c *gin.Context) {
+	resp, err := h.teamService.ListAllTeams(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *TeamHandler) Join(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	teamID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team id"})
+		return
+	}
+
+	if err := h.teamService.JoinTeam(c.Request.Context(), userID, teamID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "joined team"})
+}
+
 func (h *TeamHandler) Get(c *gin.Context) {
 	teamID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -97,6 +123,34 @@ func (h *TeamHandler) GetMembers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+func (h *TeamHandler) UpdateMemberRole(c *gin.Context) {
+	operatorID := c.MustGet("user_id").(uuid.UUID)
+	teamID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team id"})
+		return
+	}
+
+	targetUserID, err := uuid.Parse(c.Param("user_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	var req dto.UpdateMemberRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.teamService.UpdateMemberRole(c.Request.Context(), operatorID, teamID, targetUserID, req.Role); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "member role updated"})
 }
 
 func (h *TeamHandler) Delete(c *gin.Context) {

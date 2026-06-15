@@ -391,6 +391,11 @@
                 Create Team
               </button>
             </div>
+            
+            <div class="card">
+              <h4>Find Teams to Join</h4>
+              <div id="all-teams-list-container"></div>
+            </div>
           </div>
 
           <!-- Profile Page -->
@@ -398,7 +403,9 @@
             <h3>User Profile</h3>
             <div class="card">
               <p><strong>Email:</strong> <span id="profile-email"></span></p>
-              <div id="profile-roles" style="margin-top: 10px"></div>
+              <div id="profile-roles" style="margin-top: 10px">
+                <!-- Roles will be loaded here -->
+              </div>
               <p style="margin-top: 20px">Your account is active.</p>
             </div>
           </div>
@@ -410,6 +417,7 @@
       let token = localStorage.getItem("token");
       let userEmail = localStorage.getItem("userEmail") || "";
       let teamsCache = [];
+      let currentUser = null;
 
       const pages = ["tasks", "teams", "profile"];
       const elements = {
@@ -447,8 +455,68 @@
           loadTasks();
           loadTeams();
         }
-        if (pageId === "teams") loadTeams();
+        if (pageId === "teams") {
+            loadTeams();
+            loadAllTeams();
+        }
+        if (pageId === "profile") loadProfile();
       }
+
+      async function loadAllTeams() {
+        try {
+          const res = await fetch("/api/v1/teams/all", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const allTeams = await res.json();
+          const list = document.getElementById("all-teams-list-container");
+          
+          // Filter out teams the user is already in
+          const joinedTeamIds = new Set(teamsCache.map(t => t.id));
+          const availableTeams = allTeams.filter(t => !joinedTeamIds.has(t.id));
+
+          if (availableTeams.length === 0) {
+            list.innerHTML = "<p>No new teams to join.</p>";
+            return;
+          }
+
+          list.innerHTML = availableTeams
+            .map(
+              (t) => `
+                    <div class="card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div>
+                            <strong>${t.name}</strong> <br>
+                            <small>${t.id}</small>
+                        </div>
+                        <button class="btn btn-primary" onclick="joinTeam('${t.id}')">Join</button>
+                    </div>
+                `,
+            )
+            .join("");
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      async function joinTeam(teamId) {
+        try {
+          const res = await fetch(`/api/v1/teams/${teamId}/join`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            alert("Joined team successfully!");
+            loadTeams();
+            loadAllTeams();
+            await fetchUser();
+          } else {
+            const err = await res.json();
+            alert("Error: " + err.error);
+          }
+        } catch (e) {
+          alert("Error joining team");
+        }
+      }
+
 
       // --- Auth Handlers ---
 
@@ -476,10 +544,10 @@
           const data = await res.json();
           if (data.token) {
             token = data.token;
-            const user = data.user;
-            userEmail = user.email;
+            currentUser = data.user;
+            userEmail = currentUser.email;
             localStorage.setItem("token", token);
-            localStorage.setItem("user", JSON.stringify(user));
+            localStorage.setItem("user", JSON.stringify(currentUser));
             init();
             navigate("tasks");
           } else {
@@ -502,10 +570,10 @@
           const data = await res.json();
           if (data.token) {
             token = data.token;
-            const user = data.user;
-            userEmail = user.email;
+            currentUser = data.user;
+            userEmail = currentUser.email;
             localStorage.setItem("token", token);
-            localStorage.setItem("user", JSON.stringify(user));
+            localStorage.setItem("user", JSON.stringify(currentUser));
             init();
             navigate("tasks");
           } else {
@@ -519,6 +587,7 @@
       function handleLogout() {
         token = null;
         userEmail = "";
+        currentUser = null;
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         init();
@@ -529,8 +598,8 @@
       function init() {
         const storedUser = localStorage.getItem("user");
         if (storedUser) {
-          const user = JSON.parse(storedUser);
-          userEmail = user.email;
+          currentUser = JSON.parse(storedUser);
+          userEmail = currentUser.email;
         }
 
         if (token) {
@@ -542,6 +611,54 @@
         } else {
           elements.authPage.classList.remove("hidden");
           elements.app.classList.add("hidden");
+        }
+      }
+
+
+      async function loadTasks() {
+        try {
+          const res = await fetch("/api/v1/tasks", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            return alert(
+              "Error loading tasks: " + (err.error || res.statusText),
+            );
+          }
+
+          const tasks = await res.json();
+          const list = document.getElementById("tasks-list");
+          if (!tasks.length) {
+            list.innerHTML = '<div class="card">No tasks found.</div>';
+            return;
+          }
+
+          list.innerHTML = tasks
+            .map(
+              (task) => `
+                    <div class="card task-card">
+                        <div class="task-info">
+                            <div class="task-title">${task.title}</div>
+                            <div class="task-desc">${task.description || ""}</div>
+                            <div class="task-meta">
+                                Team: ${task.team_name || "N/A"} | Created by: ${task.created_by} | Created at: ${new Date(task.created_at).toLocaleString()}
+                                <span class="status-badge ${task.status === 'done' ? 'status-done' : 'status-todo'}">${task.status}</span>
+                                ${task.assignee_id ? `<br>Assignee: ${task.assignee_id}` : ""}
+                                ${task.status === 'done' ? `<br>Completed at: ${new Date(task.completed_at).toLocaleString()} by ${task.completed_by}` : ""}
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            ${task.status !== "done" ? `<button class="btn btn-success" onclick="completeTask('${task.id}')">Complete</button>` : ""}
+                            <button class="btn btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
+                        </div>
+                    </div>
+                `,
+            )
+            .join("");
+        } catch (e) {
+          console.error(e);
+          alert("Error loading tasks");
         }
       }
 
@@ -608,56 +725,93 @@
             alert("Error: " + err.error);
           }
         } catch (e) {
-          alert("Error creating task");
+          alert("Error creating task: " + e.message);
         }
       }
 
-      async function loadTasks() {
+      async function loadProfile() {
+        if (!currentUser) return;
+        elements.profileEmail.textContent = currentUser.email;
+        
+        const rolesContainer = elements.profileRoles;
+        rolesContainer.innerHTML = "<h4>Your Team Roles:</h4>";
+        
+        if (!currentUser.roles || currentUser.roles.length === 0) {
+          rolesContainer.innerHTML += "<p>You are not a member of any teams.</p>";
+          return;
+        }
+
+        const rolesList = document.createElement("ul");
+        rolesList.style.listStyle = "none";
+        rolesList.style.padding = "0";
+
+        currentUser.roles.forEach((userRole) => {
+          const li = document.createElement("li");
+          li.className = "card";
+          li.style.marginBottom = "10px";
+          li.style.padding = "15px";
+          li.style.display = "flex";
+          li.style.justifyContent = "space-between";
+          li.style.alignItems = "center";
+
+          li.innerHTML = `
+            <div>
+              <strong>${userRole.team_name}</strong><br>
+              <small>Role: ${userRole.role}</small>
+            </div>
+            <div class="role-changer">
+              <select onchange="changeRole('${userRole.team_id}', this.value)">
+                <option value="owner" ${userRole.role === 'owner' ? 'selected' : ''}>Owner</option>
+                <option value="manager" ${userRole.role === 'manager' ? 'selected' : ''}>Manager</option>
+                <option value="member" ${userRole.role === 'member' ? 'selected' : ''}>Member</option>
+              </select>
+            </div>
+          `;
+          rolesList.appendChild(li);
+        });
+
+        rolesContainer.appendChild(rolesList);
+      }
+
+      async function changeRole(teamId, newRole) {
+        if (!confirm(`Are you sure you want to change your role in this team to ${newRole}?`)) {
+          // Reset select value if cancelled - this is a bit hacky for vanilla JS without re-rendering
+          // but we'll try to just reload the profile.
+          loadProfile();
+          return;
+        }
+
         try {
-          const res = await fetch("/api/v1/tasks", {
-            headers: { Authorization: `Bearer ${token}` },
+          const res = await fetch(`/api/v1/teams/${teamId}/members/${currentUser.id}/role`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ role: newRole }),
           });
-          if (!res.ok) {
+
+          if (res.ok) {
+            // We need to refresh the user data from the server to get the new roles
+            // In a real app, we'd probably have a /me endpoint. 
+            // For now, we'll re-login or we can just fetch the user roles if we had an endpoint.
+            // Since we don't have /me, let's assume the user needs to re-fetch or we just reload the page.
+            // Actually, let's try to fetch the user again if possible, but we don't have a simple way.
+            // A simple way is to reload the page, but that might be too disruptive.
+            // Let's try to reload the profile by re-fetching the user info if we can.
+            // Since we can't easily, let's just alert and tell them to refresh or we'll try to re-fetch.
+            alert("Role updated! Please refresh the page to see changes.");
+            location.reload();
+          } else {
             const err = await res.json();
-            return alert(
-              "Error loading tasks: " + (err.error || res.statusText),
-            );
+            alert("Error: " + err.error);
+            loadProfile();
           }
-
-          const tasks = await res.json();
-          const list = document.getElementById("tasks-list");
-          if (!tasks.length) {
-            list.innerHTML = '<div class="card">No tasks found.</div>';
-            return;
-          }
-
-          list.innerHTML = tasks
-            .map(
-              (task) => `
-                    <div class="card task-card">
-                        <div class="task-info">
-                            <div class="task-title">${task.title}</div>
-                            <div class="task-desc">${task.description || ""}</div>
-                            <div class="task-meta">
-                                Team: ${task.team_name || "N/A"} | Status: ${task.status} | Priority: ${task.priority}
-                                ${task.assignee_id ? `| Assignee: ${task.assignee_id}` : ""}
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: 8px;">
-                            ${task.status !== "done" ? `<button class="btn btn-success" onclick="completeTask('${task.id}')">Complete</button>` : ""}
-                            <button class="btn btn-danger" onclick="deleteTask('${task.id}')">Delete</button>
-                        </div>
-                    </div>
-                `,
-            )
-            .join("");
         } catch (e) {
-          console.error(e);
-          alert("Error loading tasks");
+          alert("Error changing role");
+          loadProfile();
         }
       }
-
-      // --- Team Handlers ---
 
       async function loadTeams() {
         try {
@@ -717,12 +871,33 @@
           if (res.ok) {
             document.getElementById("new-team-name").value = "";
             loadTeams();
+            await fetchUser(); // Refresh user roles
+            if (elements.app.classList.contains("active")) { // check if profile page is active
+               // This is tricky without knowing current page, just reload profile if it is active
+               if(document.getElementById("page-profile").classList.contains("active")) {
+                  loadProfile();
+               }
+            }
           } else {
             const err = await res.json();
             alert("Error: " + err.error);
           }
         } catch (e) {
           alert("Error creating team");
+        }
+      }
+
+      async function fetchUser() {
+        try {
+          const res = await fetch("/api/v1/auth/me", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            currentUser = await res.json();
+            localStorage.setItem("user", JSON.stringify(currentUser));
+          }
+        } catch (e) {
+          console.error("Error fetching user data", e);
         }
       }
 

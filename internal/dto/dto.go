@@ -37,6 +37,10 @@ type UserTeamRole struct {
 	Role     domain.Role `json:"role"`
 }
 
+type UpdateMemberRequest struct {
+	Role domain.Role `json:"role" binding:"required,oneof=owner manager member"`
+}
+
 type UpdateUserRequest struct {
 	Email string `json:"email" binding:"omitempty,email"`
 }
@@ -97,6 +101,8 @@ type TaskResponse struct {
 	TeamName       string              `json:"team_name"`
 	CreatedAt      time.Time           `json:"created_at"`
 	UpdatedAt      time.Time           `json:"updated_at"`
+	CompletedAt    *time.Time          `json:"completed_at"`
+	CompletedBy    string              `json:"completed_by"`
 }
 
 // Comment

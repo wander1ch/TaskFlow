@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/sotremont/taskflow/internal/domain"
@@ -246,6 +247,23 @@ func (s *taskService) mapToResponse(ctx context.Context, t *domain.Task) *dto.Ta
 		teamName = team.Name
 	}
 
+	completedBy := ""
+	var completedAt *time.Time
+
+	if t.Status == domain.StatusDone {
+		events, _ := s.eventRepo.ListByTaskID(ctx, t.ID)
+		for _, e := range events {
+			if e.Action == "status_changed" && e.NewValue == string(domain.StatusDone) {
+				completedAt = &e.CreatedAt
+				u, _ := s.userRepo.GetByID(ctx, e.UserID)
+				if u != nil {
+					completedBy = u.Email
+				}
+				break
+			}
+		}
+	}
+
 	return &dto.TaskResponse{
 		ID:             t.ID,
 		Title:          t.Title,
@@ -257,5 +275,7 @@ func (s *taskService) mapToResponse(ctx context.Context, t *domain.Task) *dto.Ta
 		TeamName:       teamName,
 		CreatedAt:      t.CreatedAt,
 		UpdatedAt:      t.UpdatedAt,
+		CompletedAt:    completedAt,
+		CompletedBy:    completedBy,
 	}
 }

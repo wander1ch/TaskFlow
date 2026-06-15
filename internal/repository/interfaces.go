@@ -17,6 +17,7 @@ type UserRepository interface {
 type TeamRepository interface {
 	Create(ctx context.Context, team *domain.Team) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Team, error)
+	List(ctx context.Context) ([]domain.Team, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Team, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	

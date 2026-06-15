@@ -93,6 +93,11 @@ func (m *MockTeamRepo) GetMember(ctx context.Context, teamID, userID uuid.UUID) 
 	return args.Get(0).(*domain.TeamMember), args.Error(1)
 }
 
+func (m *MockTeamRepo) List(ctx context.Context) ([]domain.Team, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]domain.Team), args.Error(1)
+}
+
 func (m *MockTeamRepo) GetMembersByUserID(ctx context.Context, userID uuid.UUID) ([]domain.TeamMember, error) {
 	args := m.Called(ctx, userID)
 	return args.Get(0).([]domain.TeamMember), args.Error(1)

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/sotremont/taskflow/internal/dto"
 	"github.com/sotremont/taskflow/internal/service"
 )
@@ -46,6 +47,17 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	resp, err := h.authService.Login(c.Request.Context(), req)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+func (h *AuthHandler) GetMe(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	resp, err := h.authService.GetMe(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

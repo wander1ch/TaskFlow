@@ -62,8 +62,10 @@ func (s *Server) setupRoutes() {
 				teams.DELETE("/:id", s.teamHandler.Delete)
 				teams.POST("/:id/members", s.teamHandler.AddMember)
 				teams.POST("/:id/join", s.teamHandler.Join)
+				teams.DELETE("/:id/members/:user_id", s.teamHandler.RemoveMember)
 				teams.GET("/:id/members", s.teamHandler.GetMembers)
 				teams.PATCH("/:id/members/:user_id/role", s.teamHandler.UpdateMemberRole)
+
 				teams.GET("/:id/analytics", s.taskHandler.GetAnalytics)
 			}
 			tasks := protected.Group("/tasks")

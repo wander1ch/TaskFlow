@@ -71,6 +71,28 @@ func (h *TeamHandler) Join(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "joined team"})
 }
 
+func (h *TeamHandler) RemoveMember(c *gin.Context) {
+	operatorID := c.MustGet("user_id").(uuid.UUID)
+	teamID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid team id"})
+		return
+	}
+
+	targetUserID, err := uuid.Parse(c.Param("user_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	if err := h.teamService.RemoveMember(c.Request.Context(), operatorID, teamID, targetUserID); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "member removed"})
+}
+
 func (h *TeamHandler) Get(c *gin.Context) {
 	teamID, err := uuid.Parse(c.Param("id"))
 	if err != nil {

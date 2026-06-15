@@ -329,6 +329,7 @@
               Tasks
             </li>
             <li id="nav-teams" onclick="navigate('teams')">Teams</li>
+            <li id="nav-groups" onclick="navigate('groups')">Groups</li>
             <li id="nav-profile" onclick="navigate('profile')">Profile</li>
           </ul>
         </nav>
@@ -398,6 +399,12 @@
             </div>
           </div>
 
+          <!-- Groups Page -->
+          <div id="page-groups" class="page">
+            <h3>Your Groups</h3>
+            <div id="groups-list-container"></div>
+          </div>
+
           <!-- Profile Page -->
           <div id="page-profile" class="page">
             <h3>User Profile</h3>
@@ -419,7 +426,7 @@
       let teamsCache = [];
       let currentUser = null;
 
-      const pages = ["tasks", "teams", "profile"];
+      const pages = ["tasks", "teams", "groups", "profile"];
       const elements = {
         authPage: document.getElementById("auth-page"),
         app: document.getElementById("app"),
@@ -459,18 +466,105 @@
             loadTeams();
             loadAllTeams();
         }
+        if (pageId === "groups") {
+            loadGroups();
+        }
         if (pageId === "profile") loadProfile();
+      }
+
+      async function loadGroups() {
+        if (!currentUser || !currentUser.roles) return;
+        const container = document.getElementById("groups-list-container");
+        container.innerHTML = "<h4>Your Teams:</h4>";
+        
+        currentUser.roles.forEach(role => {
+            const div = document.createElement("div");
+            div.className = "card";
+            div.innerHTML = `<h5>${role.team_name}</h5> <div id="members-${role.team_id}">Loading members...</div>`;
+            container.appendChild(div);
+            loadMembers(role.team_id);
+        });
+      }
+
+      async function loadMembers(teamId) {
+        try {
+          const res = await fetch(`/api/v1/teams/${teamId}/members`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const members = await res.json();
+          const container = document.getElementById(`members-${teamId}`);
+          
+          // Get current user role in this team
+          const userRole = currentUser.roles.find(r => r.team_id === teamId).role;
+          
+          container.innerHTML = `
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+              <tr style="border-bottom: 1px solid #ddd; text-align: left;">
+                <th style="padding: 8px;">Email</th>
+                <th style="padding: 8px;">Role</th>
+                <th style="padding: 8px;">Actions</th>
+              </tr>
+              ${members.map(m => `
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 8px;">${m.email}</td>
+                    <td style="padding: 8px;">${m.role}</td>
+                    <td style="padding: 8px; display: flex; gap: 5px;">
+                        ${userRole === 'owner' || (userRole === 'manager' && m.role !== 'owner' && m.role !== 'manager') ? 
+                            `<button class="btn btn-danger" style="padding: 5px 10px; font-size: 12px;" onclick="removeMember('${teamId}', '${m.user_id}')">Remove</button>` : ''}
+                        ${userRole === 'owner' ? `
+                            <select style="width: auto; padding: 5px; font-size: 12px;" onchange="updateMemberRole('${teamId}', '${m.user_id}', this.value)">
+                                <option value="member" ${m.role === 'member' ? 'selected' : ''}>Member</option>
+                                <option value="manager" ${m.role === 'manager' ? 'selected' : ''}>Manager</option>
+                                <option value="owner" ${m.role === 'owner' ? 'selected' : ''}>Owner</option>
+                            </select>
+                        ` : ''}
+                    </td>
+                </tr>
+              `).join('')}
+            </table>
+          `;
+        } catch (e) {
+            console.error(e);
+        }
+      }
+
+      async function removeMember(teamId, userId) {
+          if (!confirm("Are you sure you want to remove this member?")) return;
+          try {
+            const res = await fetch(`/api/v1/teams/${teamId}/members/${userId}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (res.ok) {
+                alert("Member removed successfully!");
+                loadGroups();
+            } else {
+                const err = await res.json();
+                alert("Error: " + err.error);
+            }
+          } catch (e) {
+            alert("Error removing member");
+          }
+      }
+
+      async function updateMemberRole(teamId, userId, newRole) {
+          // Re-use existing changeRole logic or update PATCH endpoint
+          await changeRole(teamId, newRole);
+          loadGroups();
       }
 
       async function loadAllTeams() {
         try {
+          // First, make sure we have the latest list of teams the user is in
+          await loadTeams(); 
+          
           const res = await fetch("/api/v1/teams/all", {
             headers: { Authorization: `Bearer ${token}` },
           });
           const allTeams = await res.json();
           const list = document.getElementById("all-teams-list-container");
           
-          // Filter out teams the user is already in
+          // Filter out teams the user is already in using the now-updated teamsCache
           const joinedTeamIds = new Set(teamsCache.map(t => t.id));
           const availableTeams = allTeams.filter(t => !joinedTeamIds.has(t.id));
 

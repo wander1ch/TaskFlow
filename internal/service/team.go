@@ -18,6 +18,7 @@ type TeamService interface {
 	ListTeams(ctx context.Context, userID uuid.UUID) ([]dto.TeamResponse, error)
 	ListAllTeams(ctx context.Context) ([]dto.TeamResponse, error)
 	AddMember(ctx context.Context, operatorID, teamID uuid.UUID, req dto.AddMemberRequest) error
+	RemoveMember(ctx context.Context, operatorID, teamID, targetUserID uuid.UUID) error
 	JoinTeam(ctx context.Context, userID, teamID uuid.UUID) error
 	GetMembers(ctx context.Context, teamID uuid.UUID) ([]dto.MemberResponse, error)
 	DeleteTeam(ctx context.Context, operatorID, teamID uuid.UUID) error
@@ -45,6 +46,16 @@ func (s *teamService) ListAllTeams(ctx context.Context) ([]dto.TeamResponse, err
 
 func (s *teamService) JoinTeam(ctx context.Context, userID, teamID uuid.UUID) error {
 	return s.teamRepo.AddMember(ctx, teamID, userID, domain.RoleMember)
+}
+
+func (s *teamService) RemoveMember(ctx context.Context, operatorID, teamID, targetUserID uuid.UUID) error {
+	// RBAC: Only owner can remove members
+	isOwner, err := s.CheckRole(ctx, teamID, operatorID, domain.RoleOwner)
+	if err != nil || !isOwner {
+		return fmt.Errorf("unauthorized: only team owner can remove members")
+	}
+
+	return s.teamRepo.RemoveMember(ctx, teamID, targetUserID)
 }
 
 type teamService struct {
